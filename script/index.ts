@@ -3,12 +3,12 @@ const fs = require('fs');
 require('dotenv').config();
 
 const RPC_URL = 'https://testnet-rpc.monad.xyz';
-const contractAddress = '0xFfB0BB467364476DE5aA7A6002bbD9a3ce9E9e08';
+const contractAddress = '0x406DF2d8B3D703BB7e387b6d0c3bEDD273a5cFdf';  // 替换成你的合约地址
 const privateKey = process.env.PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(privateKey, provider);
-const minAmount = 80;
-const maxAmount = 200;
+const minAmount = 80;  // 最小金额
+const maxAmount = 200;  // 最大金额
 
 const contractAbi = [
   'function addToWhitelist(address[] calldata accounts, uint256[] calldata amounts) external',
@@ -78,6 +78,6 @@ async function setupWhitelistAndAmounts() {
 setupWhitelistAndAmounts()
   .then(() => console.log('设置完成'))
   .catch((error) => {
-    console.error('错误:', error.message);
-    process.exit(1);
+    // console.error('错误:', error.message);
+    // process.exit(1);
   });
