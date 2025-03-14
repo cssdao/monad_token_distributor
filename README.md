@@ -3,6 +3,13 @@
 ## 项目概述
 `MonadTestTokenDistributor` 是一个用于在 Monad 测试网分发测试代币的智能合约。
 
+## 编译智能合约
+要编译智能合约，请运行以下命令：
+
+```sh
+npx hardhat compile
+```
+
 ## 部署
 使用以下命令部署合约：
 
