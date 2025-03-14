@@ -7,22 +7,21 @@ const contractAddress = '0xFfB0BB467364476DE5aA7A6002bbD9a3ce9E9e08';
 const privateKey = process.env.PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(privateKey, provider);
-const minAmount = 50;
-const maxAmount = 1000;
+const minAmount = 80;
+const maxAmount = 200;
 
 const contractAbi = [
   'function addToWhitelist(address[] calldata accounts, uint256[] calldata amounts) external',
   'function claim() external',
   'function getContractBalance() view returns (uint256)',
   'function isWhitelisted(address) view returns (bool)',
-  'function hasClaimedStatus(address) view returns (bool)',
   'function getClaimableAmount(address) view returns (uint256)',
 ];
 const contract = new ethers.Contract(contractAddress, contractAbi, wallet);
 
 function loadWalletsFromFile(filePath: string) {
   const fileContent = fs.readFileSync(filePath, 'utf8');
-  const lines = fileContent.split('\n').map((line: string) => line.trim()).filter(Boolean); // 去除空行
+  const lines = fileContent.split('\n').map((line: string) => line.trim()).filter(Boolean);
   const wallets: string[] = [];
   const amounts: number[] = [];
 
@@ -68,9 +67,8 @@ async function setupWhitelistAndAmounts() {
   console.log('验证结果:');
   for (const address of whitelist) {
     const isWhitelisted = await contract.isWhitelisted(address);
-    const hasClaimed = await contract.hasClaimedStatus(address);
     const amount = await contract.getClaimableAmount(address);
-    console.log(`${address}: ${isWhitelisted ? '白名单中' : '不在白名单'}, 已领取: ${hasClaimed}, 可领取 ${ethers.formatEther(amount)} MON`);
+    console.log(`${address}: ${isWhitelisted ? '白名单中' : '不在白名单'}, 可领取 ${ethers.formatEther(amount)} MON`);
   }
 
   const balance = await contract.getContractBalance();
@@ -80,6 +78,6 @@ async function setupWhitelistAndAmounts() {
 setupWhitelistAndAmounts()
   .then(() => console.log('设置完成'))
   .catch((error) => {
-    // console.error('错误:', error.message);
+    console.error('错误:', error.message);
     process.exit(1);
   });

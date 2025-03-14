@@ -5,7 +5,6 @@ contract MonadTokenDistribute {
     address public owner;
 
     mapping(address => bool) public whitelist;
-    mapping(address => bool) public hasClaimed;
     mapping(address => uint256) public claimableAmount;
 
     event TokensClaimed(address indexed claimant, uint256 amount, uint256 timestamp);
@@ -39,11 +38,9 @@ contract MonadTokenDistribute {
     function claim() external {
         address claimant = msg.sender;
         require(whitelist[claimant], "Address not whitelisted");
-        require(!hasClaimed[claimant], "Already claimed");
         uint256 amount = claimableAmount[claimant];
         require(address(this).balance >= amount, "Insufficient contract balance");
 
-        hasClaimed[claimant] = true;
         whitelist[claimant] = false;
         (bool sent, ) = claimant.call{value: amount}("");
         require(sent, "Failed to send MON");
@@ -65,10 +62,6 @@ contract MonadTokenDistribute {
 
     function isWhitelisted(address account) external view returns (bool) {
         return whitelist[account];
-    }
-
-    function hasClaimedStatus(address account) external view returns (bool) {
-        return hasClaimed[account];
     }
 
     function getClaimableAmount(address account) external view returns (uint256) {
