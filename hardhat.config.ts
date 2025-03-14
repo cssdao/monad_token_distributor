@@ -1,6 +1,8 @@
 import type { HardhatUserConfig } from 'hardhat/config';
 import '@nomicfoundation/hardhat-toolbox-viem';
-import { vars } from 'hardhat/config';
+require('dotenv').config();
+
+const privateKey = process.env.PRIVATE_KEY || '';
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -15,17 +17,18 @@ const config: HardhatUserConfig = {
   networks: {
     monadTestnet: {
       url: 'https://testnet-rpc.monad.xyz',
-      accounts: [vars.get('PRIVATE_KEY')],
+      accounts: [privateKey],
       chainId: 10143,
     },
   },
+  // configuration for harhdat-verify plugin
   etherscan: {
     enabled: false,
   },
   sourcify: {
     enabled: true,
-    apiUrl: 'https://sourcify-api-monad.blockvision.org',
-    browserUrl: 'https://testnet.monadexplorer.com',
+    apiUrl: "https://sourcify-api-monad.blockvision.org",
+    browserUrl: "https://testnet.monadexplorer.com",
   },
 };
 

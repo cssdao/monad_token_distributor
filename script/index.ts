@@ -2,6 +2,13 @@ const ethers = require('ethers');
 const fs = require('fs');
 require('dotenv').config();
 
+// 公共配置
+const config = {
+  minClaimAmount: 10, // 最小领取金额（Ether）
+  maxClaimAmount: 20, // 最大领取金额（Ether）
+  deadlineDuration: 24 * 60 * 60, // 签名有效期（秒）
+};
+
 const privateKey = process.env.PRIVATE_KEY;
 const RPC_URL = 'https://testnet-rpc.monad.xyz';
 const contractAddress = '0xb2f82D0f38dc453D596Ad40A37799446Cc89274A';
@@ -31,22 +38,26 @@ function loadWalletsFromFile(filePath: string) {
 
 async function batchGenerateSignatures() {
   const claimants = loadWalletsFromFile('wallets.txt');
-
   if (claimants.length === 0) {
     console.error('没有有效的钱包地址可供处理');
     return [];
   }
 
-  console.log('开始生成签名数据...');
-
   const signatures = [];
-  const deadlineDuration = 24 * 60 * 60; // 24小时
 
   for (const claimant of claimants) {
-    const nonce = await contract.getNonce(claimant);
-    const randomAmountEther = 2900 + Math.random() * (3000 - 2900);
+    let nonce;
+    try {
+      nonce = await contract.getNonce(claimant);
+      console.log(`Nonce for ${claimant}:`, nonce.toString());
+    } catch (error) {
+      console.error(`获取 ${claimant} 的 nonce 失败:`, error);
+      continue;
+    }
+
+    const randomAmountEther = config.minClaimAmount + Math.random() * (config.maxClaimAmount - config.minClaimAmount);
     const amountWei = ethers.parseEther(randomAmountEther.toFixed(18));
-    const deadline = Math.floor(Date.now() / 1000) + deadlineDuration;
+    const deadline = Math.floor(Date.now() / 1000) + config.deadlineDuration;
 
     // 计算消息哈希
     const messageHash = ethers.keccak256(
@@ -55,8 +66,6 @@ async function batchGenerateSignatures() {
         [claimant, amountWei, nonce, deadline, contractAddress]
       )
     );
-
-    // 直接签名 messageHash，Ethers.js 会自动添加前缀
     const signature = await wallet.signMessage(ethers.getBytes(messageHash));
 
     signatures.push({
