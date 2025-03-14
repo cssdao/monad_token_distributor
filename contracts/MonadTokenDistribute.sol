@@ -4,13 +4,12 @@ pragma solidity ^0.8.0;
 contract MonadTokenDistribute {
     address public owner;
 
-    uint256 public minClaimAmount = 10 ether;
-    uint256 public maxClaimAmount = 20 ether;
-
-    mapping(address => uint256) public totalClaimed;
-    mapping(address => uint256) public claimedNonce;
+    mapping(address => bool) public whitelist;
+    mapping(address => bool) public hasClaimed;
+    mapping(address => uint256) public claimableAmount;
 
     event TokensClaimed(address indexed claimant, uint256 amount, uint256 timestamp);
+    event Whitelisted(address indexed account, bool status, uint256 amount);
 
     constructor() {
         owner = msg.sender;
@@ -18,45 +17,38 @@ contract MonadTokenDistribute {
 
     receive() external payable {}
 
-    function setClaimRange(uint256 _minAmount, uint256 _maxAmount) external {
-        require(msg.sender == owner, "Only owner can set claim range");
-        require(_minAmount <= _maxAmount, "Min amount must be less than or equal to max amount");
-        minClaimAmount = _minAmount;
-        maxClaimAmount = _maxAmount;
+    function addToWhitelist(address[] calldata accounts, uint256[] calldata amounts) external {
+        require(msg.sender == owner, "Only owner can modify whitelist");
+        require(accounts.length == amounts.length, "Arrays length mismatch");
+        for (uint256 i = 0; i < accounts.length; i++) {
+            whitelist[accounts[i]] = true;
+            claimableAmount[accounts[i]] = amounts[i];
+            emit Whitelisted(accounts[i], true, amounts[i]);
+        }
     }
 
-    function claim(bytes memory signature) external {
+    function removeFromWhitelist(address[] calldata accounts) external {
+        require(msg.sender == owner, "Only owner can modify whitelist");
+        for (uint256 i = 0; i < accounts.length; i++) {
+            whitelist[accounts[i]] = false;
+            claimableAmount[accounts[i]] = 0;
+            emit Whitelisted(accounts[i], false, 0);
+        }
+    }
+
+    function claim() external {
         address claimant = msg.sender;
-
-        // 计算消息哈希
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(claimant, minClaimAmount, maxClaimAmount, claimedNonce[claimant], block.timestamp + 24 hours, address(this))
-        );
-        bytes32 ethSignedMessageHash = toEthSignedMessageHash(messageHash);
-
-        // 恢复签名者
-        address signer = recoverSigner(ethSignedMessageHash, signature);
-        require(signer == owner, "Invalid signature");
-
-        // 从签名中解码参数
-        (uint256 amount, uint256 nonce, uint256 deadline) = abi.decode(
-            abi.encodePacked(signature), // 假设签名后附加了参数（见脚本）
-            (uint256, uint256, uint256)
-        );
-
-        // 验证参数
-        require(block.timestamp <= deadline, "Signature expired");
-        require(claimedNonce[claimant] == nonce, "Invalid or used nonce");
-        require(amount >= minClaimAmount && amount <= maxClaimAmount, "Amount out of range");
+        require(whitelist[claimant], "Address not whitelisted");
+        require(!hasClaimed[claimant], "Already claimed");
+        uint256 amount = claimableAmount[claimant];
         require(address(this).balance >= amount, "Insufficient contract balance");
 
-        // 更新状态并转账
-        claimedNonce[claimant]++;
-        totalClaimed[claimant] += amount;
-
+        hasClaimed[claimant] = true;
+        whitelist[claimant] = false;
         (bool sent, ) = claimant.call{value: amount}("");
         require(sent, "Failed to send MON");
         emit TokensClaimed(claimant, amount, block.timestamp);
+        emit Whitelisted(claimant, false, 0);
     }
 
     function withdraw() external {
@@ -71,34 +63,15 @@ contract MonadTokenDistribute {
         return address(this).balance;
     }
 
-    function getTotalClaimed(address claimant) external view returns (uint256) {
-        return totalClaimed[claimant];
+    function isWhitelisted(address account) external view returns (bool) {
+        return whitelist[account];
     }
 
-    function getNonce(address claimant) external view returns (uint256) {
-        return claimedNonce[claimant];
+    function hasClaimedStatus(address account) external view returns (bool) {
+        return hasClaimed[account];
     }
 
-    function toEthSignedMessageHash(bytes32 hash) private pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
-    }
-
-    function recoverSigner(bytes32 ethSignedMessageHash, bytes memory signature) private pure returns (address) {
-        (uint8 v, bytes32 r, bytes32 s) = splitSignature(signature);
-        return ecrecover(ethSignedMessageHash, v, r, s);
-    }
-
-    function splitSignature(bytes memory sig)
-        private
-        pure
-        returns (uint8 v, bytes32 r, bytes32 s)
-    {
-        require(sig.length == 65, "Invalid signature length");
-        assembly {
-            r := mload(add(sig, 32))
-            s := mload(add(sig, 64))
-            v := byte(0, mload(add(sig, 96)))
-        }
-        return (v, r, s);
+    function getClaimableAmount(address account) external view returns (uint256) {
+        return claimableAmount[account];
     }
 }

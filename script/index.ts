@@ -2,95 +2,84 @@ const ethers = require('ethers');
 const fs = require('fs');
 require('dotenv').config();
 
-const config = {
-  minClaimAmount: 10,
-  maxClaimAmount: 20,
-  deadlineDuration: 24 * 60 * 60,
-};
-
-const privateKey = process.env.PRIVATE_KEY;
 const RPC_URL = 'https://testnet-rpc.monad.xyz';
-const contractAddress = '0x23a0e51c9F11a6f61372Cf81353EC2a0DD9dbF47';
+const contractAddress = '0xFfB0BB467364476DE5aA7A6002bbD9a3ce9E9e08';
+const privateKey = process.env.PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(privateKey, provider);
+const minAmount = 1;
+const maxAmount = 2;
 
 const contractAbi = [
-  'function getNonce(address claimant) external view returns (uint256)',
+  'function addToWhitelist(address[] calldata accounts, uint256[] calldata amounts) external',
+  'function claim() external',
+  'function getContractBalance() view returns (uint256)',
+  'function isWhitelisted(address) view returns (bool)',
+  'function hasClaimedStatus(address) view returns (bool)',
+  'function getClaimableAmount(address) view returns (uint256)',
 ];
-const contract = new ethers.Contract(contractAddress, contractAbi, provider);
+const contract = new ethers.Contract(contractAddress, contractAbi, wallet);
 
 function loadWalletsFromFile(filePath: string) {
-  try {
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const wallets = fileContent
-      .split('\n')
-      .map((line: string) => line.trim())
-      .filter((line: string) => ethers.isAddress(line));
-    return wallets;
-  } catch (error) {
-    console.error(`读取 ${filePath} 失败:`, error);
-    return [];
-  }
-}
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+  const lines = fileContent.split('\n').map((line: string) => line.trim()).filter(Boolean); // 去除空行
+  const wallets: string[] = [];
+  const amounts: number[] = [];
 
-async function batchGenerateSignatures() {
-  const claimants = loadWalletsFromFile('wallets.txt');
-  if (claimants.length === 0) {
-    console.error('没有有效的钱包地址可供处理');
-    return [];
-  }
-  console.log('开始生成签名数据...', `共 ${claimants.length} 个地址`);
-
-  const signatures = [];
-
-  for (const claimant of claimants) {
-    let nonce;
-    try {
-      nonce = await contract.getNonce(claimant);
-      console.log(`${claimant} 获取 nonce 成功: ${nonce}`);
-    } catch (error: any) {
-      console.error(`${claimant} 获取 nonce 失败:`, error.message);
-      continue;
+  lines.forEach((line: string) => {
+    const [address, amountStr] = line.split('-');
+    if (!ethers.isAddress(address)) {
+      console.warn(`无效地址: ${address}，跳过此行`);
+      return;
     }
 
-    const randomAmountEther = config.minClaimAmount + Math.random() * (config.maxClaimAmount - config.minClaimAmount);
-    const amountWei = ethers.parseEther(randomAmountEther.toFixed(18));
-    const deadline = Math.floor(Date.now() / 1000) + config.deadlineDuration;
+    let amount;
+    if (amountStr && !isNaN(Number(amountStr))) {
+      amount = ethers.parseEther(amountStr); // 使用指定的金额，转换为 wei
+      console.log(`解析到地址 ${address}，指定金额 ${amountStr} MON`);
+    } else {
+      amount = generateRandomAmount(minAmount, maxAmount); // 无金额时生成随机值
+      console.log(`解析到地址 ${address}，无指定金额，生成随机值 ${ethers.formatEther(amount)} MON`);
+    }
 
-    const messageHash = ethers.keccak256(
-      ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address', 'uint256', 'uint256', 'uint256', 'address'],
-        [claimant, amountWei, nonce, deadline, contractAddress]
-      )
-    );
-    const signatureBase = await wallet.signMessage(ethers.getBytes(messageHash));
+    wallets.push(address);
+    amounts.push(amount);
+  });
 
-    const extraData = ethers.AbiCoder.defaultAbiCoder().encode(
-      ['uint256', 'uint256', 'uint256'],
-      [amountWei, nonce, deadline]
-    );
-    const signature = ethers.concat([signatureBase, extraData]);
-
-    signatures.push({
-      address: claimant,
-      signature,
-    });
-  }
-
-  const outputFile = 'signatures.json';
-  if (signatures.length > 0) {
-    fs.writeFileSync(outputFile, JSON.stringify(signatures, null, 2));
-  } else {
-    console.warn('没有生成任何签名，未保存文件');
-  }
-
-  return signatures;
+  if (!wallets.length) throw new Error('No valid addresses in whitelist.txt');
+  return { wallets, amounts };
 }
 
-batchGenerateSignatures()
-  .then((signatures) => {
-    console.log(`所有地址签名生成完成，总数: ${signatures.length}`);
-  })
+function generateRandomAmount(min: number, max: number) {
+  const randomEther = min + Math.random() * (max - min);
+  return ethers.parseEther(randomEther.toString());
+}
+
+async function setupWhitelistAndAmounts() {
+  console.log('调用者地址:', wallet.address);
+  
+  const { wallets: whitelist, amounts } = loadWalletsFromFile('whitelist.txt');
+
+  const txWhitelist = await contract.addToWhitelist(whitelist, amounts, { gasLimit: 200000 * whitelist.length });
+  console.log('Tx Hash (addToWhitelist):', txWhitelist.hash);
+  await txWhitelist.wait();
+  console.log(`已添加 ${whitelist.length} 个地址到白名单并设置金额`);
+
+  console.log('验证结果:');
+  for (const address of whitelist) {
+    const isWhitelisted = await contract.isWhitelisted(address);
+    const hasClaimed = await contract.hasClaimedStatus(address);
+    const amount = await contract.getClaimableAmount(address);
+    console.log(`${address}: ${isWhitelisted ? '白名单中' : '不在白名单'}, 已领取: ${hasClaimed}, 可领取 ${ethers.formatEther(amount)} MON`);
+  }
+
+  const balance = await contract.getContractBalance();
+  console.log('合约余额:', ethers.formatEther(balance));
+}
+
+setupWhitelistAndAmounts()
+  .then(() => console.log('设置完成'))
   .catch((error) => {
-    console.error('生成签名过程中发生全局错误:', error.message);
+    // console.error('错误:', error.message);
+    process.exit(1);
   });
