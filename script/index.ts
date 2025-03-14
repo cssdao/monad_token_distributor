@@ -7,8 +7,8 @@ const contractAddress = '0xFfB0BB467364476DE5aA7A6002bbD9a3ce9E9e08';
 const privateKey = process.env.PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(privateKey, provider);
-const minAmount = 1;
-const maxAmount = 2;
+const minAmount = 50;
+const maxAmount = 1000;
 
 const contractAbi = [
   'function addToWhitelist(address[] calldata accounts, uint256[] calldata amounts) external',
