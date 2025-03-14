@@ -9,6 +9,12 @@
 ```sh
 npx hardhat compile
 ```
+## 创建.env 文件
+在项目根目录下创建 `.env` 文件，并添加以下内容：
+
+```sh
+PRIVATE_KEY=<YOUR_PRIVATE_KEY>
+```
 
 ## 部署
 使用以下命令部署合约：
