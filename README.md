@@ -39,11 +39,15 @@ npx hardhat verify --network monadTestnet <DEPLOYED_CONTRACT_ADDRESS>
 npx hardhat verify --network monadTestnet 0x23a0e51c9F11a6f61372Cf81353EC2a0DD9dbF47
 ```
 
-## 注意事项
-- 确保 `hardhat.config.ts` 文件已正确配置 Monad 测试网参数。
-- 如果需要进行合约验证，可能需要配置 API Key。
-- 在运行上述命令前，请确保已安装所有必要的依赖项。
+## 添加白名单
+批量添加白名单，请运行以下命令：
 
-## 许可证
-本项目基于 MIT 许可证开源。
+```sh
+pnpm start
+```
 
+## 注意事项  
+- 确保 `hardhat.config.ts` 文件已正确配置 Monad 测试网参数。  
+- 运行 `pnpm start` 前，请替换为你的合约地址，并设置领取范围。  
+- 将白名单地址添加到 `whitelist.txt` 文件，每行一个地址。如需为特定地址设置领取金额，请在地址后加 `-`，然后填写金额。  
+- 运行前，请确保已安装所有必要依赖。
