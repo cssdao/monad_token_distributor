@@ -42,6 +42,7 @@ contract MonadTokenDistribute {
         require(address(this).balance >= amount, "Insufficient contract balance");
 
         whitelist[claimant] = false;
+        claimableAmount[claimant] = 0;
         (bool sent, ) = claimant.call{value: amount}("");
         require(sent, "Failed to send MON");
         emit TokensClaimed(claimant, amount, block.timestamp);
