@@ -4,9 +4,12 @@ require("dotenv").config();
 
 const contractAddress = "0xCDa3d21EDE6D74d54F706CB560B0b42E6BCe29e1"; // 替换成你的合约地址
 const privateKey = process.env.PRIVATE_KEY;
+if (!privateKey) {
+  throw new Error("PRIVATE_KEY is not set in .env file");
+}
 const rpcUrl = process.env.RPC_URL;
 const provider = new ethers.JsonRpcProvider(rpcUrl);
-const wallet = new ethers.Wallet(privateKey, provider);
+const wallet = new ethers.Wallet(privateKey as string, provider);
 const minAmount = 5; // 最小金额
 const maxAmount = 10; // 最大金额
 
@@ -26,7 +29,7 @@ function loadWalletsFromFile(filePath: string) {
     .map((line: string) => line.trim())
     .filter(Boolean);
   const wallets: string[] = [];
-  const amounts: number[] = [];
+  const amounts: bigint[] = [];
 
   lines.forEach((line: string) => {
     const [address, amountStr] = line.split("-");
